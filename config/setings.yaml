@@ -1,0 +1,7 @@
+mqtt:
+  broker: "test.mosquitto.org"
+  topic: "iot/fake_data"
+  frequency: 2 # Frekvencija slanja podataka u sekundama
+
+data:
+  num_samples: 100 # Broj uzoraka za generisanje
