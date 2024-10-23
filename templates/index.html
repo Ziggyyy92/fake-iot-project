@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IoT Device Monitor</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../static/style.css" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js CDN -->
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1 class="text-center mb-4">IoT Device Monitor</h1>
+
+      <div class="mb-3">
+        <label for="deviceFilter" class="form-label"
+          >Filter by Device ID:</label
+        >
+        <select id="deviceFilter" class="form-select">
+          <option value="all">All Devices</option>
+        </select>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-striped table-hover" id="data-table">
+          <thead class="table-dark">
+            <tr>
+              <th>Device ID</th>
+              <th>Timestamp</th>
+              <th>Temperature (Celsius)</th>
+              <th>Humidity (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Podaci ce biti popunjeni dinamicki -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-around mt-4">
+        <canvas
+          class="w-50"
+          id="temperatureChart"
+          style="max-width: 800px; margin: 20px auto"
+        ></canvas>
+        <canvas
+          class="w-50"
+          id="humidityChart"
+          style="max-width: 800px; margin: 20px auto"
+        ></canvas>
+      </div>
+    </div>
+
+    <script>
+      const socket = io(); // Povezivanje na WebSocket server
+
+      socket.on('new_data', function(newData) {
+        // Dodaj novi red u tabelu
+        const row = `
+            <tr>
+                <td>${newData.device_id}</td>    
+                <td>${newData.timestamp}</td>    
+                <td>${newData.temperature}</td>    
+                <td>${newData.humidity}</td>    
+            </tr>
+        `;
+        $("#data-table tbody").prepend(row);
+
+        // Azuriraj podatke za grafikone
+        updateCharts([newData]);
+      })
+
+      // Azurira grafikone sa jednim novim podatkom (dodavanje na kraj niza)
+      function updateCharts(newData) {
+        const newTimestamp = newData[0].timestamp;
+        const newTemp = newData[0].temperature;
+    const newHumidity = newData[0].humidity;
+
+    if (tempChart && humidityChart) {
+        // Dodavanje novih vrednosti u grafikone
+        tempChart.data.labels.push(newTimestamp);
+        tempChart.data.datasets[0].data.push(newTemp);
+        tempChart.update();
+
+        humidityChart.data.labels.push(newTimestamp);
+        humidityChart.data.datasets[0].data.push(newHumidity);
+        humidityChart.update();
+        }
+      }
+      // Funkcija koja povlaci podatke sa API-ja i azurira tabelu
+
+      function fetchData(deviceId = "all") {
+        $.getJSON("/api/data", function (data) {
+          if (deviceId !== "all") {
+            data = data.filter((item) => item.device_id === deviceId);
+          }
+
+          let rows = "";
+          data.forEach((item) => {
+            rows += `
+                        <tr>
+                            <td>${item.device_id}</td>
+                            <td>${item.timestamp}</td>
+                            <td>${item.temperature}</td>
+                            <td>${item.humidity}</td>
+                        </tr>`;
+          });
+
+          $("#data-table tbody").html(rows);
+          updateCharts(data);
+          checkThresholds(data);
+
+          // Popunjava opcije za filtriranje uredjaja ako su prazne
+          const deviceIds = [...new Set(data.map((item) => item.device_id))];
+          if ($("#deviceFilter option").length === 1) {
+            deviceIds.forEach((id) => {
+              $("#deviceFilter").append(`<option value="${id}">${id}</option>`);
+            });
+          }
+        });
+      }
+
+      // Azuriranje podataka i grafikona na svake 5 sekundi
+      setInterval(() => fetchData($("#deviceFilter").val()), 5000);
+      fetchData(); // Prvi poziv odmah po ucitavanju stranice
+
+      // Promena uredjaja u polju za filtriranje
+      $("#deviceFilter").change(function () {
+        fetchData($(this).val());
+      });
+    </script>
+  </body>
+</html>
